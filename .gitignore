@@ -1,3 +1,5 @@
 .env
 .venv 
-.aws 
+.aws
+.dockerignore
+preprocessing/data
