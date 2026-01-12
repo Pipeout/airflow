@@ -27,7 +27,8 @@ jobs:
       - name: Build and push docker image
         uses: docker/build-push-action@v6
         with:
-          context: infra/Dockerfile
+          context: .
+          path: infra/Dockerfile
           push: true
           tags: |
             ${{ secrets.DOCKERHUB_USERNAME }}/airflow:latest
