@@ -1,0 +1,9 @@
+COLUMNS:
+  MOTIVO_EVASAO_VALUE: "EXCLUSAO POR CONCLUSAO (FORMADO)"
+  MOTIVO_EVASAO_COLUMN: "Situação atual"
+
+DATA_CLEANING:
+  RAW: dataset/
+  RAW_HISTORY: ../data/history/historico_escolar.csv
+  RAW_DEACTIVE: ../data/deactive/alunos_inativos.csv
+  RAW_ACTIVE: ../data/active/alunos_ativos.csv

@@ -1,0 +1,12 @@
+services:
+  app:
+    build:
+      context: .. # <-- project root
+      dockerfile: infra/Dockerfile
+    container_name: feature_engineering_agent
+    working_dir: /app
+    volumes:
+      - ../:/app # mount the whole parent folder
+      - ../data:/data
+        # <-- mount src from parent
+    #command: python3 main.py
