@@ -4,5 +4,6 @@
 .env 
 .aws 
 __pycache__/
-docker-compose.yml 
+infra/docker-compose.yml 
 .github 
+preprocessing/data
