@@ -1,18 +1,30 @@
-FROM python:3.13-slim
+FROM apache/airflow:3.1.5
 
-WORKDIR /app
+USER root 
 
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends \
+         vim \
+  && apt-get autoremove -yqq --purge \
+  && apt-get clean \
+  && rm -rf /var/lib/apt/lists/* \
+
+
+USER airflow 
 
 RUN pip install --no-cache-dir \
-  airflow \
   pandas \
   s3fs \
   boto3
 
-COPY . .
-COPY scripts/entrypoint.sh /app/entrypoint.sh
+WORKDIR /opt/airflow 
 
-RUN chmod +x /app/entrypoint.sh
+COPY dags/ dags/
+COPY preprocessing/ preprocessing
+
+COPY scripts/entrypoint.sh /entrypoint.sh
+
+RUN chmod +x /entrypoint.sh
 
 EXPOSE 8080 5555 8793
 
