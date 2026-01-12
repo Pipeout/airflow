@@ -1,14 +1,16 @@
-FROM python:3.13-slim 
+FROM python:3.13-slim
 
 WORKDIR /app
 
-COPY infra/requirements.txt .
 
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir \
+  airflow \
+  pandas \
+  s3fs \
+  boto3
 
-    
 COPY . .
-COPY entrypoint.sh /app/entrypoint.sh
+COPY scripts/entrypoint.sh /app/entrypoint.sh
 
 RUN chmod +x /app/entrypoint.sh
 

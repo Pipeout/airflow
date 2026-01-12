@@ -1,0 +1,1 @@
+echo "[entrypoint] Starting the Airflow DAG"
