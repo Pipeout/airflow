@@ -1,4 +1,5 @@
-airflow
 pandas
-s3fs
 boto3
+s3fs
+unidecode
+numpy

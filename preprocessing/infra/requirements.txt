@@ -1,9 +1,0 @@
-pandas==2.3.1
-scikit-learn==1.7.1
-numpy==2.2.6
-dask==2025.7.0
-tqdm==4.67.1
-tsfresh==0.21.1
-boto3==1.40.70
-s3fs==2025.10.0
-unidecode
