@@ -23,6 +23,7 @@ jobs:
 
       - name: Set up Buildx
         uses: docker/setup-buildx-action@v3
+        
       - name: Debug filesystem
         run: |
           echo "PWD:"
@@ -41,3 +42,14 @@ jobs:
           tags: |
             ${{ secrets.DOCKERHUB_USERNAME }}/airflow:latest
             ${{ secrets.DOCKERHUB_USERNAME }}/airflow:${{ github.sha }}
+            # --- NEW STEP: RUN THE PIPELINE ---
+      
+      - name: Run Data Cleaning Pipeline
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        run: |
+              docker run --rm \
+              -e AWS_ACCESS_KEY_ID \
+              -e AWS_SECRET_ACCESS_KEY \
+              ${{ secrets.DOCKERHUB_USERNAME }}/airflow:latest

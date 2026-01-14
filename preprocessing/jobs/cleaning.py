@@ -2,29 +2,30 @@ import logging
 import os
 import re
 import time
+import unicodedata
 from datetime import date
 from typing import Any, Callable
 
 import numpy as np
 import pandas as pd
-import unidecode
 import yaml
 
-CONFIG_PATH =  "../configs/cleaning.yaml"
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
+CONFIG_PATH = os.path.join(BASE_DIR, "../configs/cleaning.yaml")
 
 def normalize_names(text: str) -> str:
-  """
-  Removes accents and make the text lowercase
+  """Removes accents
   """
   if pd.isnull(text):
       return text
   text = str(text)
-  text = unidecode.unidecode(text)
-  text = text.lower().strip()
-  text = re.sub(r'[^\w\s]', '', text)
-  text = text.title()
-  return text
+  clean_text = (
+        unicodedata.normalize('NFKD', text)
+        .encode('ascii', errors='ignore')
+        .decode('utf-8')
+    )
+  return clean_text.lower().strip()
 
 # this functions maps the mispelled cities to their correct name
 def match_cities_name(df: pd.DataFrame, column: str) -> pd.DataFrame:
@@ -80,13 +81,14 @@ def match_cities_name(df: pd.DataFrame, column: str) -> pd.DataFrame:
 
 
 # this function takes two dates in string format and calculate their difference in years  (date1 - date2)
-def calculate_difference_between_dates(df: pd.DataFrame, date1: str, date2: str, new_column_name: str) -> pd.DataFrame:
+def calculate_age(df: pd.DataFrame, date1: str, date2: str, new_column_name: str) -> pd.DataFrame:
     """
     Users native datetime to calculate date1 - date2
     """
     try:
-        df[date1] = pd.to_datetime(df[date1], errors='raise')
-        df[date2]= pd.to_datetime(df[date2], errors='raise')
+      # this one is "Data de Ocorrência"
+        df[date1] = pd.to_datetime(df[date1], format="%d/%m/%Y %H:%M:%S", errors='raise')
+        df[date2]= pd.to_datetime(df[date2], format="%m/%d/%Y",errors='raise')
         df.loc[:,new_column_name] = ((df[date1] - df[date2]).dt.days / 365.25)
     except Exception as e:
             logging.info(f'\n[ERRO]: {e}')
@@ -139,12 +141,15 @@ def total_time_stay(df: pd.DataFrame, ocurrence_date: str, entrance_date: str, t
     - Total_Time =  Ocurrence - Entrance
   Therefore the total time to evasion is 2 years
   """
-
-  df = calculate_difference_between_dates(df, ocurrence_date, entrance_date, target_column_name)
+  try:
+     # this one is "Data de Ocorrência"
+       df[ocurrence_date] = pd.to_datetime(df[ocurrence_date], format="%d/%m/%Y %H:%M:%S", errors='raise')
+       df[entrance_date]= pd.to_datetime(df[entrance_date], format="%Y",errors='raise')
+       df.loc[:,target_column_name] = ((df[ocurrence_date] - df[entrance_date]).dt.days / 365.25)
+  except Exception as e:
+           logging.info(f'\n[ERRO]: {e}')
+           raise
   return df
-
-
-
 
 def estimating_ocurrence_date_or_year(df: pd.DataFrame, ocurrence_date: str, estimate_year = False) ->  pd.DataFrame:
   """
@@ -192,17 +197,37 @@ def counting_amount_of_sf(df: pd.DataFrame, column_sf: str, key: str) -> pd.Data
   counts.reset_index()
   return df
 
+def load_config(CONFIG_PATH) :
+  """
+  Selects the current dataset's config file we are interest in.
+  """
+  with open(CONFIG_PATH, "r") as f:
+    full_config = yaml.safe_load(f)
+
+  try:
+    current_dataset = full_config["CURRENT_DATASET"]
+    logging.info(f"\nloading current dataset: {current_dataset}")
+    if current_dataset not in full_config['DATASETS']:
+      raise ValueError(f"\nDataset {current_dataset} not found!")
+
+    return full_config["DATASETS"][current_dataset]
+
+  except Exception as e:
+    logging.exception(f"There was an error handling the config cleaning.yaml file {e}")
+    raise
+
+
 
 def load_datasets(CONFIG_PATH: str) -> pd.DataFrame:
   """
   Loads the datasets and separetes them
   """
-  config = yaml.safe_load(open(CONFIG_PATH))
 
-  df_active = pd.read_csv(config['DATA_CLEANING']['RAW_ACTIVE'])
-  df_deactive = pd.read_csv(config['DATA_CLEANING']['RAW_DEACTIVE'])
-  df_history = pd.read_csv(config['DATA_CLEANING']['RAW_HISTORY'])
+  config = load_config(CONFIG_PATH)
 
+  df_active = pd.read_csv(config['RAW_ACTIVE'])
+  df_deactive = pd.read_csv(config['RAW_DEACTIVE'])
+  df_history = pd.read_csv(config['RAW_HISTORY'])
   """
   Here we are distinguinshing those finished college and who dropped out
   """
@@ -272,34 +297,35 @@ def counting_failure_per_nucleo(df: pd.DataFrame) -> pd.DataFrame:
   """
   Counts the which area of knowledge the person has most failled
   """
-  failures = df[df['SF'].isin(['RM' ,'RMF', 'RP','RF'])]
-  nucleo_counts = failures.groupby(["rga_anonimo","Núcleo de Disciplinas"]).size()
+  failures = df[df['Situação'].isin(['RM' ,'RMF', 'RP','RF'])]
+  nucleo_counts = failures.groupby(["RGA_Anon","Núcleo de Disciplinas"]).size()
   for (rga, disciplina), nucleo_counts in nucleo_counts.items():
-    df.loc[df['rga_anonimo'] == rga,
+    df.loc[df['RGA_Anon'] == rga,
       f"reprovacoes_{disciplina}"] = nucleo_counts
     df.fillna({f"reprovacoes_{disciplina}": 0},inplace=True)
   return df
-
 
 def extract_entrance_year(df: pd.DataFrame, entrance_year: str, target_col: str) -> pd.DataFrame:
   df.loc[:,target_col] = df[entrance_year] // 10
   return df
 
-
-
-
 def cleaning_pipeline ():
+
   """
   This is the main function. It defines and processes datasets
   """
   logging.basicConfig(level=logging.INFO)
   logging.info("\n\n[INFO]: Starting application...")
 
-  # Loading dataset
   try:
+    logging.info("\n\nPASSEDD heree ")
+
     logging.info("\n\n[INFO]: Loading datasets...")
     df_active, df_deactive, df_history, df_finished, df_evaded = load_datasets(CONFIG_PATH)
-    df_merged = merging_datasets_with_history(df_finished, df_evaded, df_active, df_history, 'rga_anonimo', 'right')
+
+    logging.info("EEEEntered heree ")
+    df_merged = merging_datasets_with_history(df_finished, df_evaded, df_active, df_history, 'RGA_Anon', 'right')
+
     logging.info("\n\n[OK]: Sucessfully loaded and merged the datasets")
   except Exception as e:
     logging.exception(f"[ERROR]: Could not load datasets properly{e}")
@@ -310,7 +336,7 @@ def cleaning_pipeline ():
       df_merged
       .pipe(log_and_pipe,
            '[OK]: Sucessfully created column - Idade',
-            calculate_difference_between_dates,
+            calculate_age,
            'Data ocorrência',  'Data Nascimento', 'Idade')
       .pipe(log_and_pipe,
            '[OK]: Sucessfully created column - Ano Ingresso e Semestre Ingresso',
@@ -327,11 +353,8 @@ def cleaning_pipeline ():
       .pipe(log_and_pipe,
            '[OK]:Sucessfully counted the amount of failure and approvation',
             counting_amount_of_sf,
-           'SF', 'rga_anonimo')
+           'Situação', 'RGA_Anon')
     )
-    # completatmente eerrado
-    # print(df_merged['Ano Ingresso'].head(50))
-    # print(df_merged['Ano_Periodo_Atual'])
 
   except Exception as e:
         logging.exception(f"[ERROR]: There was an exception creating new columns in the dataset {e}")
@@ -346,13 +369,17 @@ def cleaning_pipeline ():
       .pipe(log_and_pipe,
            'Sucessfully grouped disciplines together',
             mapping_disciplines_names,
-            "Disciplina","Núcleo de Disciplinas" ,"CC")
+            "Nome_Disciplina","Núcleo de Disciplinas" ,"CC")
       .pipe(log_and_pipe,
            'Sucessfully mapped reprovations per nucleo',
             counting_failure_per_nucleo)
     )
 
-    df_merged.to_csv("now.csv", index=False)
+    # Intermediate dataset after cleaning the dataset
+    config_to_preprocessed = load_config(CONFIG_PATH)
+    path_to_preprocessed = config_to_preprocessed["PREPROCESSED_DATASET"]
+
+    df_merged.to_csv(path_to_preprocessed, index=False)
 
   except Exception as e:
     logging.exception(f"[ERROR]: There was an exception resolving name conflics{e} ")
@@ -360,6 +387,6 @@ def cleaning_pipeline ():
 
 if __name__ == "__main__":
   start_time = time.time()
-  pipeline()
+  cleaning_pipeline()
   total_time = time.time() - start_time
   print(f"\ntotal time taken: {total_time:.2f}s\n")

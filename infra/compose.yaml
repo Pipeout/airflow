@@ -1,15 +1,18 @@
 services:
   airflow:
-     build:
-       context: ..
-       dockerfile: infra/Dockerfile 
-     container_name: airflow-app
-     volumes:
-      - ..dags:/opt/airflow/dags 
-      - ..preprocessing:opt/airflow/preprocessing
-    
-     environment:
+    build:
+      context: ..
+      dockerfile: infra/Dockerfile
+    container_name: airflow-app
+    volumes:
+      - ../dags:/opt/airflow/dags
+      - ../preprocessing:/opt/airflow/preprocessing
+
+    environment:
       - AIRFLOW__CORE__LOAD_EXAMPLES=False
-     ports:
-        - "8080:8080"
-     command: standalone
+      - PYTHONPATH=/opt/airflow
+    ports:
+      - "8080:8080"
+    # env_file:
+    #   - ../.env
+    command: standalone

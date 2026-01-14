@@ -1,9 +1,10 @@
 .git/
-.gitignore 
-.venv/  
-.env 
-.aws 
+.gitignore
+.venv/
+.env
+infra/compose.yaml
+.aws
 __pycache__/
-infra/docker-compose.yml 
+infra/docker-compose.yml
 .github/
 preprocessing/data

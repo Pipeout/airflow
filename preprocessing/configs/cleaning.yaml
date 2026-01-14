@@ -1,9 +1,12 @@
-COLUMNS:
-  MOTIVO_EVASAO_VALUE: "EXCLUSAO POR CONCLUSAO (FORMADO)"
-  MOTIVO_EVASAO_COLUMN: "Situação atual"
+CURRENT_DATASET: "CIENCIA_DA_COMPUTACAO"
 
-DATA_CLEANING:
-  RAW: dataset/
-  RAW_HISTORY: ../data/history/historico_escolar.csv
-  RAW_DEACTIVE: ../data/deactive/alunos_inativos.csv
-  RAW_ACTIVE: ../data/active/alunos_ativos.csv
+DATASETS:
+  CIENCIA_DA_COMPUTACAO:
+    RAW_HISTORY: s3://pipeout-database/datasets /ciencia_da_computacao/historico/ciencia_da_computacao_historico_escolar_2017_2025_1.csv
+    RAW_DEACTIVE: s3://pipeout-database/datasets /ciencia_da_computacao/inativos/ciencia_da_computacao_inativos_2017_2025_1.csv
+    RAW_ACTIVE: s3://pipeout-database/datasets /ciencia_da_computacao/ativos/ciencia_da_computacao_ativos_2017_2025_1.csv
+    TRAINING_DATASET: s3://pipeout-database/datasets /ciencia_da_computacao/treino/ciencia_da_computacao_2017_1_2025_1_treino.csv
+    PREPROCESSED_DATASET: s3://pipeout-database/datasets /ciencia_da_computacao/preprocessed/preprocessed_dataset.csv
+    COLUMNS:
+      MOTIVO_EVASAO_VALUE: "EXCLUSAO POR CONCLUSAO (FORMADO)"
+      MOTIVO_EVASAO_COLUMN: "Situação atual"
