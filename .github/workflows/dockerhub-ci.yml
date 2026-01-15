@@ -42,7 +42,6 @@ jobs:
           tags: |
             ${{ secrets.DOCKERHUB_USERNAME }}/airflow:latest
             ${{ secrets.DOCKERHUB_USERNAME }}/airflow:${{ github.sha }}
-            # --- NEW STEP: RUN THE PIPELINE ---
       
       - name: Run Data Cleaning Pipeline
         env:
