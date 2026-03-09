@@ -24,15 +24,6 @@ jobs:
       - name: Set up Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Debug filesystem
-        run: |
-          echo "PWD:"
-          pwd
-          echo "Repo root:"
-          ls -la
-          echo "Infra folder:"
-          ls -la infra
-
       - name: Build and push docker image
         uses: docker/build-push-action@v6
         with:
