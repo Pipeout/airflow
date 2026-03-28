@@ -5,235 +5,15 @@ import time
 import unicodedata
 from datetime import date
 from typing import Any, Callable
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
 import yaml
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-
-CONFIG_PATH = os.path.join(BASE_DIR, "../configs/cleaning.yaml")
-
-def normalize_names(text: str) -> str:
-  """Removes accents
-  """
-  if pd.isnull(text):
-      return text
-  text = str(text)
-  clean_text = (
-        unicodedata.normalize('NFKD', text)
-        .encode('ascii', errors='ignore')
-        .decode('utf-8')
-    )
-  return clean_text.lower().strip()
-
-# this functions maps the mispelled cities to their correct name
-def match_cities_name(df: pd.DataFrame, column: str) -> pd.DataFrame:
-    """
-    Standardize confusing city names
-    """
-    regex_mapping = {
-        r".*cuiaba.*|.*CUIABA.*|.*Cuiabamt.*": "Cuiabá",
-        r".*aragarcas.*|.*Aragarcasgo.*|.*ARAGARÇAS.*": "Aragarças",
-        r".*barra do garcas.*|.*Barra Do Garcas.*|.*BARRA DO GARÇAS.*": "Barra Do Garças",
-        r".*alta floresta.*|.*Alta Floresta.*|.*ALTA FLORESTA.*": "Alta Floresta",
-        r".*nova xavantina.*|.*Nova Xavantina.*": "Nova Xavantina",
-        r".*baliza.*|.*Baliza Go.*": "Baliza",
-        r".*rondonopolis.*|.*Rondonopolitano.*": "Rondonópolis",
-        r".*braganca.*|.*Braganca Pa.*": "Bragança",
-        r".*palmitos.*|.*Palmitossc.*": "Palmitos",
-        r".*vazante.*|.*Vazante Mg.*": "Vazante",
-        r".*jussara.*|.*Jussarago.*": "Jussara",
-        r".*rio branco.*|.*Rio Branco  Mt.*": "Rio Branco",
-        r".*mato grosso.*|.*Mato Grossointerior.*": "Mato Grosso",
-        r".*chapeco.*|.*Chapecosc.*": "Chapecó",
-        r".*agua boa.*|.*Agua Boamt.*": "Água Boa",
-        r".*sao joaquim.*|.*Sao Joaquim Sc.*": "São Joaquim",
-        r".*Brasilia.*|.*df.*|.*brasilia.*": "Brasília",
-        r".*Goiania.*|.*goianiago.*|.*Goiânia.*": "Goiânia",
-        r".*São Paulo.*|.*Sao Paulo.*|.*sao paulo.*": "São Paulo",
-        r".*Canabravamg.*": "Canabrava"
-
-
-    }
-    try:
-
-      df.loc[:, column] = df[column].apply(normalize_names)
-
-      def apply_regex(name):
-        if not isinstance(name, str):
-            return name
-        for pattern, correct_name in regex_mapping.items():
-            if re.search(pattern, name, re.IGNORECASE):
-                return correct_name
-        return name
-
-      if column in df.columns:
-        df.loc[:, column] = df[column].apply(apply_regex)
-        return df
-      raise KeyError(f"Column {column} does not exist")
-
-    except KeyError as e:
-      print(f"Column {e} does not exist in dataset.")
-    except RuntimeError as e:
-      print(f"Can't fill data{e}")
 
 
 
-# this function takes two dates in string format and calculate their difference in years  (date1 - date2)
-def calculate_age(df: pd.DataFrame, date1: str, date2: str, new_column_name: str) -> pd.DataFrame:
-    """
-    Users native datetime to calculate date1 - date2
-    """
-    try:
-      # this one is "Data de Ocorrência"
-        df[date1] = pd.to_datetime(df[date1], format="%d/%m/%Y %H:%M:%S", errors='raise')
-        df[date2]= pd.to_datetime(df[date2], format="%m/%d/%Y",errors='raise')
-        df.loc[:,new_column_name] = ((df[date1] - df[date2]).dt.days / 365.25)
-    except Exception as e:
-            logging.info(f'\n[ERRO]: {e}')
-            raise
-    return df
-
-
-
-# def correct_period_formats(df: pd.DataFrame, date1: str, date2: str, new_column_name: str)
-def fill_column_with_content(df: pd.DataFrame, column: str, content = 0, fill_all = False ) -> pd.DataFrame:
-    """
-    Fill all means fill the whole column with that content. False means fill NaN only.
-    Content equall to zero defaults to fill zero
-    """
-    try:
-        if column not in df.columns:
-             raise KeyError("Column {column} does not exist in DataFrame.")
-        if fill_all:
-            df[column] = content
-        else:
-            df.fillna({column: content}, inplace=True)
-        return df
-    except RuntimeError as e:
-            print(f'\n[ERRO]: There was an error filling data with content {e}')
-    except KeyError as e:
-            print(f'\n[ERRO]: Column was not found: {e}')
-
-
-
-def standardize_year_and_semester(df: pd.DataFrame, column: str ,year_col: str, semester_col: str) -> pd.DataFrame:
-  """
-  Extracts Semester something happened. As in [Perído] = 20201 -> means year = 2020 and semester = 1
-  """
-  if column in df.columns:
-      df[column] = df[column].astype(str)
-      df.loc[:,semester_col] = df[column].str[-1]
-      df.loc[:,year_col] = df[column].str[:4]
-      #df.loc[:,year_col] = df.loc[:,year_col].astype(date)
-      return df
-  else:
-    raise KeyError(f"Column {column} does not exist in current dataset")
-
-
-def total_time_stay(df: pd.DataFrame, ocurrence_date: str, entrance_date: str, target_column_name: str) -> pd.DataFrame:
-  """
-  Calculates the average time since the entrace of the student to the ocurrence of their evasion
-  As in:
-    - Ocurrence -> 2022
-    - Entrance  -> 2020
-    - Total_Time =  Ocurrence - Entrance
-  Therefore the total time to evasion is 2 years
-  """
-  try:
-     # this one is "Data de Ocorrência"
-       df[ocurrence_date] = pd.to_datetime(df[ocurrence_date], format="%d/%m/%Y %H:%M:%S", errors='raise')
-       df[entrance_date]= pd.to_datetime(df[entrance_date], format="%Y",errors='raise')
-       df.loc[:,target_column_name] = ((df[ocurrence_date] - df[entrance_date]).dt.days / 365.25)
-  except Exception as e:
-           logging.info(f'\n[ERRO]: {e}')
-           raise
-  return df
-
-def estimating_ocurrence_date_or_year(df: pd.DataFrame, ocurrence_date: str, estimate_year = False) ->  pd.DataFrame:
-  """
-  Returns the ['Data ocorrência'] field. If it is null, it returns the year of ['Periodo ingresso']
-  """
-  df.loc[:,ocurrence_date] = pd.to_datetime(df[ocurrence_date])
-  filtered = (df['Período ingresso'] // 10)
-  filtered = pd.to_datetime(filtered, format='%Y', errors='coerce')
-  df.loc[:,ocurrence_date] = np.where(
-    df[ocurrence_date].isnull(),
-    filtered,
-    df[ocurrence_date]
-  )
-  if estimate_year:
-    df.loc[:,'Ano_AtualNaoEhPeriodo'] = df[ocurrence_date].dt.year
-    return df
-
-
-def merging_datasets_with_history(df_finished: pd.DataFrame, df_evaded: pd.DataFrame, df_active: pd.DataFrame, df_history: pd.DataFrame, key: str, how: str) -> pd.DataFrame:
-  """
-  Merges the three important datasets with the history one
-  """
-  x = pd.concat([
-      df_finished.assign(classe="Concluinte"),
-      df_evaded.assign(classe="Evadido"),
-      df_active.assign(classe="Ativo")
-  ])
-  df_full = pd.merge(x, df_history, on=key, how=how)
-  return df_full
-
-
-def counting_amount_of_sf(df: pd.DataFrame, column_sf: str, key: str) -> pd.DataFrame:
-  """
-  Returns the amount of failure or approvation
-  """
-  counts = (
-    df
-    .groupby([key, column_sf])
-    .size()
-    .unstack(fill_value=0)
-  )
-  counts = counts.rename(columns={
-    c: f"total_{c}" for c in counts.columns
-  })
-  counts.reset_index()
-  return df
-
-def load_config(CONFIG_PATH) :
-  """
-  Selects the current dataset's config file we are interest in.
-  """
-  with open(CONFIG_PATH, "r") as f:
-    full_config = yaml.safe_load(f)
-
-  try:
-    current_dataset = full_config["CURRENT_DATASET"]
-    logging.info(f"\nloading current dataset: {current_dataset}")
-    if current_dataset not in full_config['DATASETS']:
-      raise ValueError(f"\nDataset {current_dataset} not found!")
-
-    return full_config["DATASETS"][current_dataset]
-
-  except Exception as e:
-    logging.exception(f"There was an error handling the config cleaning.yaml file {e}")
-    raise
-
-
-
-def load_datasets(CONFIG_PATH: str) -> pd.DataFrame:
-  """
-  Loads the datasets and separetes them
-  """
-
-  config = load_config(CONFIG_PATH)
-
-  df_active = pd.read_csv(config['RAW_ACTIVE'])
-  df_deactive = pd.read_csv(config['RAW_DEACTIVE'])
-  df_history = pd.read_csv(config['RAW_HISTORY'])
-  """
-  Here we are distinguinshing those finished college and who dropped out
-  """
-  df_finished = df_deactive[df_deactive[config['COLUMNS']['MOTIVO_EVASAO_COLUMN']] == config['COLUMNS']['MOTIVO_EVASAO_VALUE']]
-  df_evaded = df_deactive[df_deactive[config['COLUMNS']['MOTIVO_EVASAO_COLUMN']] != config['COLUMNS']['MOTIVO_EVASAO_VALUE']]
-  return df_active, df_deactive, df_history, df_finished, df_evaded
 
 
 def mapping_disciplines_names(df: pd.DataFrame, column: str, new_column: str, curso: str) -> pd.DataFrame:
@@ -283,6 +63,289 @@ def mapping_disciplines_names(df: pd.DataFrame, column: str, new_column: str, cu
       print(f"Can't fill data{e}")
 
 
+# BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+# CONFIG_PATH = os.path.join(BASE_DIR, "../configs/cleaning.yaml")
+
+
+def get_config_file(): 
+    try:
+        base_dir = Path(__file__).resolve().parent.parent
+        path = base_dir / "configs" / "cleaning.yaml"
+        return path
+    except NameError: # if it is a jupyter file 
+        return Path("/training-app/configs/training.yaml")
+
+CONFIG_PATH = get_config_file()
+
+# this function takes two dates in string format and calculate their difference in years  (date1 - date2)
+def calculate_age(df: pd.DataFrame, date1: str, date2: str, new_column_name: str) -> pd.DataFrame:
+    """
+    Users native datetime to calculate date1 - date2
+    """
+    try:
+      # this one is "Data de Ocorrência"
+        df[date1] = pd.to_datetime(df[date1], format="%d/%m/%Y %H:%M:%S", errors='raise')
+        df[date2]= pd.to_datetime(df[date2], format="%m/%d/%Y",errors='raise')
+        df.loc[:,new_column_name] = ((df[date1] - df[date2]).dt.days / 365.25)
+    except Exception as e:
+            logging.info(f'\n[ERRO]: {e}')
+            raise
+    return df
+
+
+
+# def correct_period_formats(df: pd.DataFrame, date1: str, date2: str, new_column_name: str)
+def fill_column_with_content(df: pd.DataFrame, column: str, content = 0, fill_all = False ) -> pd.DataFrame:
+    """
+    Fill all means fill the whole column with that content. False means fill NaN only.
+    Content equall to zero defaults to fill zero
+    """
+    try:
+        if column not in df.columns:
+             raise KeyError("Column {column} does not exist in DataFrame.")
+        if fill_all:
+            df[column] = content
+        else:
+            df.fillna({column: content}, inplace=True)
+        return df
+    except RuntimeError as e:
+            print(f'\n[ERRO]: There was an error filling data with content {e}')
+    except KeyError as e:
+            print(f'\n[ERRO]: Column was not found: {e}')
+
+###################### Inserting new functions ######################
+
+
+def calculate_ano_sem(df: pd.DataFrame) -> pd.DataFrame:
+    df['Ano']  = df['AnoSem'].astype('int')
+    df['Parcela'] = df['Semestre'] / 10
+    if 'AnoSem' in df.columns:
+        df.drop(columns={'AnoSem'}, inplace=True)
+    df['AnoSem'] = df['Ano'] + df['Parcela']
+    return df
+
+def drop_columns(df: pd.DataFrame, cols: list[str]) -> pd.DataFrame:
+    df = df.copy()
+    df.drop(columns=cols, inplace=True)
+    return df 
+
+def merge_dfs(df: pd.DataFrame, df_to_merge: pd.DataFrame, cols: list[str], how: str, key: str ) -> pd.DataFrame:
+    return df.merge(df_to_merge[cols], on=key, how=how )
+
+def standardize_column_text (df :pd.DataFrame, col: str) -> pd.DataFrame:
+    df = df.copy() 
+    df[col] = (
+    df[col]
+    .str.normalize('NFKD')
+    .str.encode('ascii', errors='ignore')
+    .str.decode('utf-8')
+    .str.upper()
+    .str.replace(r'\(OPTATIVA\)', '', regex=True)
+    .str.strip())
+    return df 
+
+    
+def load_config(CONFIG_PATH) :
+  """
+  Selects the current dataset's config file we are interest in.
+  """
+  with open(CONFIG_PATH, "r") as f:
+    full_config = yaml.safe_load(f)
+
+  try:
+    current_dataset = full_config["CURRENT_DATASET"]
+    logging.info(f"\nloading current dataset: {current_dataset}")
+    if current_dataset not in full_config['DATASETS']:
+      raise ValueError(f"\nDataset {current_dataset} not found!")
+
+    return full_config["DATASETS"][current_dataset]
+
+  except Exception as e:
+    logging.exception(f"There was an error handling the config cleaning.yaml file {e}")
+    raise
+
+
+
+def load_datasets(CONFIG_PATH: str) -> pd.DataFrame:
+  """
+  Loads the datasets and separetes them
+  """
+
+  dfs = load_config(CONFIG_PATH)
+
+  df_active = pd.read_csv(dfs['ACTIVE_DATASET'])
+  df_deactive = pd.read_csv(dfs['EVADED_DATASET'])
+  df_history = pd.read_csv(dfs['HISTORY_DATASET'])
+
+  return df_active, df_deactive, df_history
+
+
+
+def eliminating_duplicates_ap_ae(df: pd.DataFrame) -> pd.DataFrame:
+    
+    """
+    AE and AP are duplicated in the dataset. 
+    Therefore it must be converted to one single row. 
+    """
+
+    ae_ap_pairs = df.groupby(['RGA_Anon', 'Nome_Disciplina']) \
+        .filter(lambda g: {'AP', 'AE'}.issubset(set(g['Situação'])))
+
+    df_adjust = df.copy()
+
+    nota_ap = ae_ap_pairs[ae_ap_pairs['Situação'] == 'AP'] \
+        .groupby(['RGA_Anon', 'Nome_Disciplina'])['Nota'].max()
+
+    mask_ae = (df_adjust['Situação'] == 'AE') & (
+        df_adjust.set_index(['RGA_Anon', 'Nome_Disciplina']).index.isin(nota_ap.index)
+    )
+
+    df_adjust.loc[mask_ae, 'Nota'] = df_adjust.loc[mask_ae].set_index(
+        ['RGA_Anon', 'Nome_Disciplina']
+    ).index.map(nota_ap)
+
+    mask_ap_to_drop = (df_adjust['Situação'] == 'AP') & (
+        df_adjust.set_index(['RGA_Anon', 'Nome_Disciplina']).index.isin(nota_ap.index)
+    )
+
+    df_adjust = df_adjust[~mask_ap_to_drop].copy()
+    return df_adjust
+
+
+def setting_subject_faiulures (df: pd.DataFrame) -> pd.DataFrame: 
+    """
+    Convert subject status into a binary outcome:
+    - 1 = failure in a subject
+    - 0 = non-failure
+    Rows with 'MA' status are excluded.
+    """
+    df = df.copy()
+    df = df[df['Situação'] != "MA"]
+    failures = ['RMF', 'RM', 'RP', 'RF']
+
+    df['Situação']  = np.where(
+        df['Situação'].isin(failures),
+        1,
+        0
+    )
+    return df 
+
+
+def calculate_failure_ratio (df: pd.DataFrame) -> pd.DataFrame:
+
+    df['Reprovacao_Ponderada_Semestral'] = df["Crédito"]* df["Situação"]
+
+    df['Reprovacao_Ponderada_Semestral'] = (
+            df.groupby(["AnoSem",  "RGA_Anon"])["Reprovacao_Ponderada_Semestral"]
+                .transform("sum")
+    )
+
+    total_credit = df.groupby(["AnoSem",  "RGA_Anon"])['Crédito'].transform("sum")
+    total_credit = total_credit.astype("float")
+    df['Reprovacao_Ponderada_Semestral'] = df['Reprovacao_Ponderada_Semestral'].astype("float")
+        
+    df['Reprovação_Media_Semestral']  = (df['Reprovacao_Ponderada_Semestral'] / total_credit)
+    df.drop(columns={'Reprovacao_Ponderada_Semestral'}, inplace=True)
+
+    return df
+
+def selecting_valid_period(df: pd.DataFrame) -> pd.DataFrame:
+   return df[df['AnoSem'] >= 2009.1].copy()
+
+
+
+def calculate_permanence_period_in_semesters(df: pd.DataFrame) -> pd.DataFrame:
+    df = df.copy()
+    
+    # Ensure Período ingresso is float and convert to decimal
+    df['Período ingresso'] = df['Período ingresso'].astype(float) / 10
+
+    # Cap any fractional semester > 2 to 2 (e.g., 2024.3 -> 2024.2)
+    def cap_sem(x):
+        int_part = int(x)
+        frac_part = int(round((x - int_part) * 10))
+        frac_part = min(frac_part, 2)  # cap to 2
+        return float(f"{int_part}.{frac_part}")
+
+    df['AnoSemCap'] = df['AnoSem'].apply(cap_sem)
+    df['Período ingresso Cap'] = df['Período ingresso'].apply(cap_sem)
+
+    # Create chronological mapping
+    all_values = pd.concat([df['AnoSemCap'], df['Período ingresso Cap']]).dropna().unique()
+    mapping = {val: i+1 for i, val in enumerate(sorted(all_values))}
+
+    # Map to ordered IDs
+    df['AnoSemIdOrdered'] = df['AnoSemCap'].map(mapping)
+    df['PeriodoIngressoIdOrdered'] = df['Período ingresso Cap'].map(mapping)
+
+    # Calculate permanence in semesters
+    df['Tempo_Permanencia_Em_Semestres'] = df['AnoSemIdOrdered'] - df['PeriodoIngressoIdOrdered'] + 1
+
+    # Drop helper columns
+    df.drop(columns=['AnoSemIdOrdered', 'PeriodoIngressoIdOrdered', 'AnoSemCap', 'Período ingresso Cap'], inplace=True)
+    
+    return df
+
+
+def calculate_total_accumulated_credits(df: pd.DataFrame) -> pd.DataFrame: 
+
+    mapping = {
+        20241: 210,
+        20191: 200,
+        20091: 211
+    }
+    df = df.copy()
+
+    df['Total_creditos_estrutura'] = df['Estrutura'].map(mapping)
+
+    resumo_creditos = df.groupby(['RGA_Anon', 'Tempo_Permanencia_Em_Semestres'])['Crédito'].sum().reset_index()
+
+
+    resumo_creditos['Total_Creditos_Acumulados'] = resumo_creditos.groupby('RGA_Anon')['Crédito'].cumsum()
+    df = df.merge(
+        resumo_creditos[['RGA_Anon', 'Tempo_Permanencia_Em_Semestres', 'Total_Creditos_Acumulados']],
+        on=['RGA_Anon', 'Tempo_Permanencia_Em_Semestres'],
+        how='left'
+    )
+
+    return df
+
+
+def calculate_normalized_academic_age(df):
+    # 1. Definir os limites por estrutura (ajuste os valores conforme sua realidade)
+    metas = {
+        20091: {'min_credits': 211, 'ideal_semesters': 8},
+        20191: {'min_credits': 200, 'ideal_semesters': 8},
+        20241: {'min_credits': 210, 'ideal_semesters': 8}
+    }
+    df = df.copy()
+    def get_age(row):
+        struct = row['Estrutura']
+        if struct not in metas: return row['Tempo_Permanencia_Em_Semestres'] # fallback
+        
+        meta = metas[struct]
+        progresso = min(1.0, row['Total_Creditos_Acumulados'] / meta['min_credits'])
+        
+        return progresso * meta['ideal_semesters']
+
+    df['Idade_Academica'] = df.apply(get_age, axis=1)
+    df['Estrutura'] = df['Estrutura'].astype(int)
+    
+    return df
+
+
+def calculate_academic_lag_in_semesters(df: pd.DataFrame) -> pd.DataFrame: 
+    
+    df = df.copy()
+    df = df.sort_values(['RGA_Anon', 'Tempo_Permanencia_Em_Semestres'])
+    df['Tempo_Permanencia_Em_Semestres'] = df['Tempo_Permanencia_Em_Semestres'].astype(float)
+    df['Idade_Academica'] = df['Idade_Academica'].astype(float)
+    df['Lag_Academico_Em_Semestres'] = df.groupby('RGA_Anon').apply(
+    lambda g: g['Tempo_Permanencia_Em_Semestres'] - g['Idade_Academica']
+).reset_index(level=0, drop=True)
+    return df
+
+
 def log_and_pipe(df: pd.DataFrame,success_msg: str, func: Callable, *args: Any, **kwargs: Any) -> pd.DataFrame:
     """Logs the start, executes the function, logs success, and returns the DataFrame."""
     logging.info(f"\n\n[INFO]: Starting operation: {func.__name__}...")
@@ -293,21 +356,6 @@ def log_and_pipe(df: pd.DataFrame,success_msg: str, func: Callable, *args: Any, 
     return df_transformed
 
 
-def counting_failure_per_nucleo(df: pd.DataFrame) -> pd.DataFrame:
-  """
-  Counts the which area of knowledge the person has most failled
-  """
-  failures = df[df['Situação'].isin(['RM' ,'RMF', 'RP','RF'])]
-  nucleo_counts = failures.groupby(["RGA_Anon","Núcleo de Disciplinas"]).size()
-  for (rga, disciplina), nucleo_counts in nucleo_counts.items():
-    df.loc[df['RGA_Anon'] == rga,
-      f"reprovacoes_{disciplina}"] = nucleo_counts
-    df.fillna({f"reprovacoes_{disciplina}": 0},inplace=True)
-  return df
-
-def extract_entrance_year(df: pd.DataFrame, entrance_year: str, target_col: str) -> pd.DataFrame:
-  df.loc[:,target_col] = df[entrance_year] // 10
-  return df
 
 def cleaning_pipeline ():
 
@@ -315,65 +363,88 @@ def cleaning_pipeline ():
   This is the main function. It defines and processes datasets
   """
   logging.basicConfig(level=logging.INFO)
+
   logging.info("\n\n[INFO]: Starting application...")
 
   try:
-    logging.info("\n\nPASSEDD heree ")
 
     logging.info("\n\n[INFO]: Loading datasets...")
-    df_active, df_deactive, df_history, df_finished, df_evaded = load_datasets(CONFIG_PATH)
+    df_active, df_deactive, df_history,  = load_datasets(CONFIG_PATH)
 
-    logging.info("EEEEntered heree ")
-    df_merged = merging_datasets_with_history(df_finished, df_evaded, df_active, df_history, 'RGA_Anon', 'right')
+    df_merged = df_history.copy()
+    all_students = pd.concat([df_active, df_deactive], axis=0)
 
     logging.info("\n\n[OK]: Sucessfully loaded and merged the datasets")
   except Exception as e:
     logging.exception(f"[ERROR]: Could not load datasets properly{e}")
 
-  # Creating extra columns in dataset
   try:
     df_merged = (
       df_merged
-      .pipe(log_and_pipe,
-           '[OK]: Sucessfully created column - Idade',
-            calculate_age,
-           'Data ocorrência',  'Data Nascimento', 'Idade')
-      .pipe(log_and_pipe,
-           '[OK]: Sucessfully created column - Ano Ingresso e Semestre Ingresso',
-            standardize_year_and_semester,
-           'Período ingresso','Ano Ingresso', 'Semestre Ingresso')
-      .pipe(log_and_pipe,
-            '[OK]:Sucessfully extracted the current year and the current Semester',
-            standardize_year_and_semester,
-            'Período','Ano_Periodo_Atual', 'Semestre Atual',)
-      .pipe(log_and_pipe,
-           '[OK]:Sucessfully created average time to evade columns',
-            total_time_stay,
-           'Data ocorrência', 'Ano Ingresso', 'Tempo_De_Permanencia')
-      .pipe(log_and_pipe,
-           '[OK]:Sucessfully counted the amount of failure and approvation',
-            counting_amount_of_sf,
-           'Situação', 'RGA_Anon')
+
+        .pipe(log_and_pipe, 
+              '[OK]: Creating AnoSem column', 
+              calculate_ano_sem)
+
+        .pipe(log_and_pipe, 
+           '[OK]: Merging all the datasets', 
+              merge_dfs,
+              all_students, ['RGA_Anon', 'Período ingresso', 'Estrutura', 'Situação atual'],  'left', 'RGA_Anon')
+
+           .pipe(log_and_pipe, 
+           '[OK]: Standardizing the column text',
+            standardize_column_text,
+            'Nome_Disciplina')
+
+            .pipe(log_and_pipe,
+            '[OK]: Eliminated duplicates of AE and AP',
+            eliminating_duplicates_ap_ae)
+
+            .pipe(log_and_pipe,
+              '[OK]: Calculating the failure ratio per semester',
+              calculate_failure_ratio)
+
+            .pipe(log_and_pipe, 
+              '[OK]: Selecting valid period - 2009.1 plus', 
+              selecting_valid_period)
+
+              .pipe(log_and_pipe, 
+              '[OK]: Creating permance time', 
+              calculate_permanence_period_in_semesters)
+
+              .pipe(log_and_pipe, 
+              '[OK]: Summing all the accumulated credits', 
+              calculate_total_accumulated_credits) 
+
+              .pipe(log_and_pipe, 
+              '[OK]: Calculating academic age', 
+              calculate_normalized_academic_age) 
+
+              .pipe(log_and_pipe, 
+              '[OK]: Calculating academic lag in semesters', 
+              calculate_academic_lag_in_semesters) 
+              
+
+
     )
+    
 
   except Exception as e:
         logging.exception(f"[ERROR]: There was an exception creating new columns in the dataset {e}")
         raise
   try:
-    df_merged = (
-      df_merged
-      .pipe(log_and_pipe,
-           'Sucessfully corrected confusing city names',
-            match_cities_name,
-            "Naturalidade")
-      .pipe(log_and_pipe,
-           'Sucessfully grouped disciplines together',
-            mapping_disciplines_names,
-            "Nome_Disciplina","Núcleo de Disciplinas" ,"CC")
-      .pipe(log_and_pipe,
-           'Sucessfully mapped reprovations per nucleo',
-            counting_failure_per_nucleo)
-    )
+    # df_merged = (
+    #   df_merged
+    #   # .pipe(log_and_pipe,
+    #   #      'Sucessfully corrected confusing city names',
+    #   #       match_cities_name,
+    #   #       "Naturalidade")
+    #   # .pipe(log_and_pipe,
+    #   #      'Sucessfully grouped disciplines together',
+    #   #       mapping_disciplines_names,
+    #   #       "Nome_Disciplina","Núcleo de Disciplinas" ,"CC")
+     
+    # )
 
     # Intermediate dataset after cleaning the dataset
     config_to_preprocessed = load_config(CONFIG_PATH)
