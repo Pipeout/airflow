@@ -1,10 +1,10 @@
 import logging
 import os
 import time
-
+from cleaning import load_datasets
 import pandas as pd
 import yaml
-# from cleaning import load_config
+import numpy as np
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -29,28 +29,43 @@ def load_config(CONFIG_PATH) :
     logging.exception(f"There was an error handling the config cleaning.yaml file {e}")
     raise
 
-def remove_duplicates(df: pd.DataFrame) -> pd.DataFrame:
-  return df.drop_duplicates()
 
 
-def drop_columns(df: pd.DataFrame) -> pd.DataFrame:
-  try:
-      df = df.drop(
-        columns=[
-                "CH",
-                "Estrutura",
-                "Núcleo de Disciplinas",
-                "Situação atual",
+def _ (df_all_students: pd.DataFrame) -> pd.DataFrame:
+
+        df_all_students = df_all_students.rename(columns={"Período": "Periodo_Atual"})
+
+        df_all_students["Periodo_Atual"] = df_all_students["Periodo_Atual"] / 10
+
+        df_all_students["Estrutura"] = df_all_students["Estrutura"].astype("int")
+
+        df_all_students["Data Nascimento"] = pd.to_datetime(
+            df_all_students["Data Nascimento"]
+        )
+
+        df_all_students["Período ingresso"] = df_all_students["Período ingresso"] / 10
+
+        df_all_students["Ano_Ingresso"] = np.floor(df_all_students["Período ingresso"])
+
+        df_all_students["Idade_Ingresso"] = (
+            df_all_students["Ano_Ingresso"] - df_all_students["Data Nascimento"].dt.year
+        )
+
+        df_all_students = df_all_students.drop(
+            columns={
+                "Coeficiente",
                 "Estrangeiro",
-                "Situação",
                 "Nacionalidade",
-                "Período",
-                "Ano",
-                'Período ingresso'
-        ])
-  except KeyError as e:
-    raise KeyError(f"[ERROR]: column did not exist or was null{e}")
-  return df
+                "Estado Civil",
+                "Data Nascimento",
+                "Data ocorrência",
+                "Ano_Ingresso",
+            }
+        )
+
+        return df_all_students
+
+
 
 
 def selection_pipeline():
@@ -58,14 +73,47 @@ def selection_pipeline():
 
     config = load_config(CONFIG_PATH)
 
-    df = pd.read_csv(config["PREPROCESSED_DATASET"])
-    logging.info("\n\n[INFO]: Starting to drop useless columns...")
-    df = (df
-      .pipe(drop_columns)
-      .pipe(remove_duplicates)
-    )
-    print(df)
-    df.to_csv(config["TRAINING_DATASET"], index=False)
+    df_preprocessed= pd.read_csv(config["PREPROCESSED_DATASET"])
+    logging.info("\n\n[INFO]: Starting to drop useless columns...")       
+
+    try:
+        (
+            df_active,
+            df_deactive,
+            df_history,
+        ) = load_datasets(CONFIG_PATH)
+
+
+        all_students = pd.concat([df_active, df_deactive], axis=0)
+
+        all_students = _(all_students)
+
+
+        df_full = df_preprocessed.merge(
+                all_students[
+                   [
+                      "RGA_Anon",
+                      "Período ingresso",
+                      "Estrutura",
+                      "Sexo",
+                      "Raça",
+                      "Periodo_Atual",
+                      "Tipo ingresso",
+                      "IMI",
+                      "Tipo de demanda",
+                      "Idade_Ingresso",
+                  ]
+              ],
+              on=["RGA_Anon", "Período ingresso", "Estrutura"],
+              how="left",
+          )
+        
+        df_full.info()
+
+    except Exception as e:
+        logging.exception({e})
+
+    df_full.to_csv(config["TRAINING_DATASET"], index=False)
     logging.info("\n\n[OK]: Final training dataset saved to Bucket...")
 
 if __name__ == "__main__":
