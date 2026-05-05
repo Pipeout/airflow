@@ -7,12 +7,17 @@ services:
     volumes:
       - ../dags:/opt/airflow/dags
       - ../preprocessing:/opt/airflow/preprocessing
-
     environment:
       - AIRFLOW__CORE__LOAD_EXAMPLES=False
       - PYTHONPATH=/opt/airflow
+    networks:
+      - shared-net
     ports:
       - "8080:8080"
     env_file:
       - ../.env
     command: standalone
+networks:
+  shared-net:
+    external: true
+    name: ml-network
