@@ -1,4 +1,13 @@
 services:
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+      POSTGRES_DB: airflow
+    volumes:
+      - postgres-db:/var/lib/postgresql/data
+
   airflow:
     build:
       context: ..
@@ -10,6 +19,10 @@ services:
     environment:
       - AIRFLOW__CORE__LOAD_EXAMPLES=False
       - PYTHONPATH=/opt/airflow
+      # TO CREATE users in airflow 3.0
+      - AIRFLOW__CORE__AUTH_MANAGER=airflow.providers.fab.auth_manager.fab_auth_manager.FabAuthManager
+      # TO not have login in the UI every time
+      - AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_ALL_ADMINS=True
     networks:
       - shared-net
     ports:
@@ -21,3 +34,6 @@ networks:
   shared-net:
     external: true
     name: ml-network
+
+volumes:
+  postgres-db:

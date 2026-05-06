@@ -33,6 +33,20 @@ jobs:
             ${{ secrets.DOCKERHUB_USERNAME }}/airflow:latest
             ${{ secrets.DOCKERHUB_USERNAME }}/airflow:${{ github.sha }}
 
+      # - name: Get Airflow JWT
+      #   run: |
+      #     TOKEN=$(curl -s -X POST $AIRFLOW_URL/auth/token \
+      #       -H "Content-Type: application/json" \
+      #       -d "{\"username\":\"admin\",\"password\":\"${{ secrets.AIRFLOW_PASSWORD }}\"}" \
+      #       | jq -r .access_token)
+
+      #     echo "TOKEN=$TOKEN" >> $GITHUB_ENV
+      #
+      # - name: Call Airflow API
+      # run: |
+      #   curl http://$AIRFLOW_URL/api/v2/dags \
+      #     -H "Authorization: Bearer $TOKEN"
+
       # - name: Run Data Cleaning Pipeline
       #   env:
       #     AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
