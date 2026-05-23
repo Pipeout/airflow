@@ -7,15 +7,14 @@ services:
       POSTGRES_DB: airflow
     volumes:
       - postgres-db:/var/lib/postgresql/data
-
   airflow:
     build:
       context: ..
       dockerfile: infra/Dockerfile
-    container_name: airflow-app
+    container_name: airflow-pipeout
+    image: airflow-pipeout
     volumes:
       - ../dags:/opt/airflow/dags
-      - ../preprocessing:/opt/airflow/preprocessing
     environment:
       - AIRFLOW__CORE__LOAD_EXAMPLES=False
       - PYTHONPATH=/opt/airflow
