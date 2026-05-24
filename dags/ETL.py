@@ -6,7 +6,6 @@ import requests
 sys.path.append("/opt/airflow")
 from datetime import datetime
 
-from airflow.providers.docker.operators.docker import DockerOperator
 from airflow.providers.standard.operators.empty import EmptyOperator
 from airflow.providers.standard.operators.trigger_dagrun import (
     TriggerDagRunOperator,
