@@ -6,15 +6,13 @@ import requests
 sys.path.append("/opt/airflow")
 from datetime import datetime
 
+import boto3
 from airflow.providers.amazon.aws.operators.ecs import EcsRunTaskOperator
 from airflow.providers.standard.operators.empty import EmptyOperator
 from airflow.providers.standard.operators.trigger_dagrun import (
     TriggerDagRunOperator,
 )
 from airflow.sdk import DAG, task
-
-TRAINING_URL = "http://training:8081/training"
-FEATURE_ENGINEERING_URL = "http://feature_engineering:8001/feature_engineering"
 
 with DAG(
     "orchestrator_dag",
@@ -24,17 +22,33 @@ with DAG(
     tags=["cleaning"],
 ) as dag:
     start = EmptyOperator(task_id="start")
+    ssm = boto3.client("ssm")
+
+    subnets = ssm.get_parameter(Name="/myapp/ecs/subnets")["Parameter"]["Value"].split(
+        ","
+    )
+    sgs = [
+        ssm.get_parameter(Name="/myapp/ecs/feature_engineering/security_group")[
+            "Parameter"
+        ]["Value"]
+    ]
 
     feature_engineering = EcsRunTaskOperator(
         task_id="feature_engineering_task",
         reattach=True,
         task_definition="feature_engineering",
-        overrides={},
+        overrides={
+            "containerOverrides": [
+                {
+                    "name": "feat-eng-container",  # just the name, no actual overrides
+                }
+            ]
+        },
         launch_type="FARGATE",
         network_configuration={
             "awsvpcConfiguration": {
-                "subnets": ["subnet-0bb7d7337317f5166", "subnet-0b4ddab295713df12"],
-                "securityGroups": "sg-0a51e609c6dc78d75",
+                "subnets": subnets,
+                "securityGroups": sgs,
                 "assignPublicIp": "ENABLED",
             },
         },
