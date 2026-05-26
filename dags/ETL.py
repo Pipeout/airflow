@@ -6,6 +6,7 @@ import requests
 sys.path.append("/opt/airflow")
 from datetime import datetime
 
+from airflow.providers.amazon.aws.operators.ecs import EcsRunTaskOperator
 from airflow.providers.standard.operators.empty import EmptyOperator
 from airflow.providers.standard.operators.trigger_dagrun import (
     TriggerDagRunOperator,
@@ -24,19 +25,17 @@ with DAG(
 ) as dag:
     start = EmptyOperator(task_id="start")
 
-    @task(task_id="feature_engineering")
-    def run_feature_engineering():
-        requests.post(FEATURE_ENGINEERING_URL)
-
-    training = TriggerDagRunOperator(
-        task_id="trigger_training",
-        trigger_dag_id="training_dag",
+    feature_engineering = EcsRunTaskOperator(
+        task_id="feature_engineering_task",
+        reattach=True,
+        task_definition="feature_engineering",
+        cluster="pipeout-cluster",
         wait_for_completion=True,
     )
 
     end = EmptyOperator(task_id="end")
 
-    start >> run_feature_engineering() >> training >> end
+    start >> feature_engineering >> training >> end
 
 
 with DAG(
