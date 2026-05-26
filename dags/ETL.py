@@ -22,17 +22,6 @@ with DAG(
     tags=["cleaning"],
 ) as dag:
     start = EmptyOperator(task_id="start")
-    ssm = boto3.client("ssm")
-
-    subnets = ssm.get_parameter(Name="/myapp/ecs/subnets")["Parameter"]["Value"].split(
-        ","
-    )
-    sgs = [
-        ssm.get_parameter(Name="/myapp/ecs/feature_engineering/security_group")[
-            "Parameter"
-        ]["Value"]
-    ]
-
     feature_engineering = EcsRunTaskOperator(
         task_id="feature_engineering_task",
         reattach=True,
@@ -47,8 +36,10 @@ with DAG(
         launch_type="FARGATE",
         network_configuration={
             "awsvpcConfiguration": {
-                "subnets": subnets,
-                "securityGroups": sgs,
+                "subnets": os.getenv("ECS_TARGET_SUBNETS", "").split(","),
+                "securityGroups": os.getenv("ECS_TARGET_SECURITY_GROUPS", "").split(
+                    ","
+                ),
                 "assignPublicIp": "ENABLED",
             },
         },
