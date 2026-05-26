@@ -29,16 +29,13 @@ jobs:
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Build and push
+      - name: Build and push to ECR
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           IMAGE_TAG: ${{ github.sha }}
-        with:
-          context: .
-          file: infra/Dockerfile
-          push: true
+          DOCKERFILE_PATH: infra/Dockerfile
         run: |
-          docker build -t $ECR_REGISTRY/${{ env.IMAGE_NAME }}:$IMAGE_TAG .
-          docker build -t $ECR_REGISTRY/${{ env.IMAGE_NAME }}:latest .
+          docker build -f $DOCKERFILE_PATH -t $ECR_REGISTRY/${{ env.IMAGE_NAME }}:$IMAGE_TAG .
+          docker build -f $DOCKERFILE_PATH -t $ECR_REGISTRY/${{ env.IMAGE_NAME }}:latest .
           docker push $ECR_REGISTRY/${{ env.IMAGE_NAME }}:$IMAGE_TAG
           docker push $ECR_REGISTRY/${{ env.IMAGE_NAME }}:latest
