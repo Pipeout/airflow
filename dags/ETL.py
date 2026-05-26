@@ -29,6 +29,15 @@ with DAG(
         task_id="feature_engineering_task",
         reattach=True,
         task_definition="feature_engineering",
+        overrides={},
+        launch_type="FARGATE",
+        network_configuration={
+            "awsvpcConfiguration": {
+                "subnets": ["subnet-0bb7d7337317f5166", "subnet-0b4ddab295713df12"],
+                "securityGroups": "sg-0a51e609c6dc78d75",
+                "assignPublicIp": "ENABLED",
+            },
+        },
         cluster="pipeout-cluster",
         wait_for_completion=True,
     )
