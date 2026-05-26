@@ -49,7 +49,7 @@ with DAG(
 
     end = EmptyOperator(task_id="end")
 
-    start >> feature_engineering >> training >> end
+    start >> feature_engineering >> end
 
 
 with DAG(
