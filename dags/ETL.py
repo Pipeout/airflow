@@ -27,6 +27,7 @@ with DAG(
         reattach=True,
         task_definition="feature_engineering",
         overrides={},
+        region_name="us-east-2",
         launch_type="FARGATE",
         network_configuration={
             "awsvpcConfiguration": {
