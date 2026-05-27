@@ -26,13 +26,7 @@ with DAG(
         task_id="feature_engineering_task",
         reattach=True,
         task_definition="feature_engineering",
-        overrides={
-            "containerOverrides": [
-                {
-                    "name": "feat-eng-container",  # just the name, no actual overrides
-                }
-            ]
-        },
+        overrides={},
         launch_type="FARGATE",
         network_configuration={
             "awsvpcConfiguration": {
