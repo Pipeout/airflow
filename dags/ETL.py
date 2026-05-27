@@ -23,7 +23,7 @@ with DAG(
 ) as dag:
     start = EmptyOperator(task_id="start")
     feature_engineering = EcsRunTaskOperator(
-        task_id="feature_engineering_task",
+        task_id="feature_engineering_task_mapped",
         reattach=True,
         task_definition="feature_engineering",
         overrides={},
