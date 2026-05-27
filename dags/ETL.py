@@ -22,10 +22,29 @@ with DAG(
     tags=["cleaning"],
 ) as dag:
     start = EmptyOperator(task_id="start")
-    feature_engineering = EcsRunTaskOperator(
-        task_id="feature_engineering_task_mapped",
+    # feature_engineering = EcsRunTaskOperator(
+    #     task_id="feature_engineering_task_mapped",
+    #     reattach=True,
+    #     task_definition="feature_engineering",
+    #     overrides={},
+    #     region_name="us-east-2",
+    #     launch_type="FARGATE",
+    #     network_configuration={
+    #         "awsvpcConfiguration": {
+    #             "subnets": os.getenv("ECS_TARGET_SUBNETS", "").split(","),
+    #             "securityGroups": os.getenv("ECS_TARGET_SECURITY_GROUPS", "").split(
+    #                 ","
+    #             ),
+    #             "assignPublicIp": "ENABLED",
+    #         },
+    #     },
+    #     cluster="pipeout-cluster",
+    #     wait_for_completion=True,
+    # )
+    training = EcsRunTaskOperator(
+        task_id="model_training_task_mapped",
         reattach=True,
-        task_definition="feature_engineering",
+        task_definition="model_training",
         overrides={},
         region_name="us-east-2",
         launch_type="FARGATE",
@@ -43,24 +62,5 @@ with DAG(
     )
 
     end = EmptyOperator(task_id="end")
-
-    start >> feature_engineering >> end
-
-
-with DAG(
-    "training_dag",
-    description="Dag that will train the models once the datasets are properly clean",
-    start_date=datetime(2025, 1, 13),
-    catchup=False,
-    is_paused_upon_creation=False,
-    tags=["training"],
-) as training_dag:
-    start = EmptyOperator(task_id="start")
-
-    @task(task_id="train")
-    def run_training():
-        requests.post(TRAINING_URL)
-
-    end = EmptyOperator(task_id="end")
-
-    start >> run_training() >> end
+    start >> training >> end
+    # start >> feature_engineering >> end
