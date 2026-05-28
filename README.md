@@ -115,7 +115,7 @@ These values define:
 
 Infrastructure definitions, task definitions, and environment injection configuration are available in the IaC repository:
 
-[Pipeout IaC Repository][(https://github.com/Pipeout/IaC?utm_source=chatgpt.com)](https://github.com/Pipeout/IaC/blob/main/ecs_task_definitions.tf)
+[Pipeout IaC Repository](https://github.com/Pipeout/IaC/blob/main/ecs_task_definitions.tf)
 
 ---
 
