@@ -22,6 +22,27 @@ with DAG(
     tags=["cleaning"],
 ) as dag:
     start = EmptyOperator(task_id="start")
+
+    preprocessing = EcsRunTaskOperator(
+        task_id="preprocessing_task_mapped",
+        reattach=True,
+        task_definition="preprocessing",
+        overrides={},
+        region_name="us-east-2",
+        launch_type="FARGATE",
+        network_configuration={
+            "awsvpcConfiguration": {
+                "subnets": os.getenv("ECS_TARGET_SUBNETS", "").split(","),
+                "securityGroups": os.getenv("ECS_TARGET_SECURITY_GROUPS", "").split(
+                    ","
+                ),
+                "assignPublicIp": "ENABLED",
+            },
+        },
+        cluster="pipeout-cluster",
+        wait_for_completion=True,
+    )
+
     feature_engineering = EcsRunTaskOperator(
         task_id="feature_engineering_task_mapped",
         reattach=True,
@@ -62,4 +83,4 @@ with DAG(
     )
 
     end = EmptyOperator(task_id="end")
-    start >> feature_engineering >> training >> end
+    start >> preprocessing >> feature_engineering >> training >> end
